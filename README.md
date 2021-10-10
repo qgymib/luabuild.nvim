@@ -57,3 +57,45 @@ require("luabuild").make(rule, opt)
 + `type`: _string_
     
     > Build type, one of "debug" / "release". Default is "release".
+
+## Example
+
+Let's take [telescope-fzf-native.nvim](https://github.com/nvim-telescope/telescope-fzf-native.nvim) as example. The meaningful part of their makefile is:
+
+```Makefile
+CFLAGS = -Wall -Werror -fpic -std=gnu99
+COVERAGE ?=
+
+ifeq ($(OS),Windows_NT)
+    MKD = -mkdir
+    RM = cmd /C rmdir /Q /S
+    CC = gcc
+    TARGET := libfzf.dll
+else
+    MKD = mkdir -p
+    RM = rm -rf
+    TARGET := libfzf.so
+endif
+
+all: build/$(TARGET)
+
+build/$(TARGET): src/fzf.c src/fzf.h
+	$(MKD) build
+	$(CC) -O3 $(CFLAGS) -shared src/fzf.c -o build/$(TARGET)
+```
+
+The equal luabuild code is:
+```lua
+require("luabuild").make({
+    -- Target name is 'libfzf.dll', the extension will be automatically added.
+    name = "libfzf",
+    -- We need to build a dll, known as `shared` library.
+    mode = "shared",
+    -- Install to 'build' directory
+    install = "build",
+    -- Add source file here
+    source = { "src/fzf.c" },
+    -- They use '-std=gnu99', it is c99 standard
+    standard = { c = "c99" },
+})
+```
