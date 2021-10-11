@@ -1,5 +1,18 @@
 # luabuild.nvim
-A lua build system for neovim.
+A cross platform lua native build system for Neovim, support C/C++.
+
+I build this tool because I want to use [telescope-fzf-native.nvim](https://github.com/nvim-telescope/telescope-fzf-native.nvim) on Windows. Sadly they use Makefile and add incompatible compile flag `-fpic` on Windows.
+
+Now that I already install [llvm-mingw](https://github.com/mstorsjo/llvm-mingw) (It is portable so I can carry the whole Neovim environment with a USB device), I do not want to install a lot of other things like Cygwin or MSYS2 to just install a single Neovim plug.
+
+So here comes `luabuild`, a cross platform pure lua build system for Neovim!
+
+# Feature
+
++ Support linux and windows, macos is not tested.
++ Support `gcc` / `clang` / `cl`.
++ Simple compile rule, learn it within 1 minute.
++ Does not rely on `make` or `cmake`, you only need a compiler.
 
 ## Install
 
