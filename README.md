@@ -19,7 +19,7 @@ So here comes `luabuild`, a cross platform pure lua build system for Neovim!
 ```lua
 use {
     "qgymib/luabuild.nvim",
-    requires = "plenary.nvim"
+    requires = "nvim-lua/plenary.nvim"
 }
 ```
 
