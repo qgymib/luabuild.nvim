@@ -1,3 +1,4 @@
 set rtp+=.
-set rtp+=test/plenary.nvim
-runtime 
+set rtp+=test/vendor/plenary.nvim
+
+runtime plugin/plenary.vim
