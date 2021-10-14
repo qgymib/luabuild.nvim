@@ -243,7 +243,7 @@ local function luabuild_setup(target)
     end
     install_dir = nil
 
-    if target.c.src ~= nil then
+    if target.c ~= nil then
         for _, info in pairs(target.c.src) do
             local obj_path = string.match(info.object, "(.*[/\\])")
 
@@ -252,7 +252,7 @@ local function luabuild_setup(target)
         end
     end
 
-    if target.cxx.src ~= nil then
+    if target.cxx ~= nil then
         for _, info in pairs(target.cxx.src) do
             local obj_path = string.match(info.object, "(.*[/\\])")
 
@@ -269,21 +269,29 @@ end
 --- Generate compile object path from source file path
 -- @param target A dict
 -- @param opt User defined options
-local function luabuild_add_object(target, opt)
-    for _, src in ipairs(target.source) do
-        local src_file = opt.cwd .. target.separator .. src
-        -- current we don't known compiler, so object extension is unknown, need to fix later
-        local dst_file = target.tmp_dir .. target.separator .. src
-        local ext = string.lower(luabuild_get_file_extension(src_file))
+local function luabuild_add_object(target)
+    local ext
+    if target.c ~= nil then
+        if target.c.compiler == "gcc" or target.c.compiler == "clang" then
+            ext = ".o"
+        elseif target.c.compiler == "cl" then
+            ext = ".obj"
+        end
+        for k, v in pairs(target.c.src) do
+            local dst_file = target.tmp_dir .. target.separator .. k .. ext
+            v.object = dst_file
+        end
+    end
 
-        if ext == "c" then
-            target.c.src = target.c.src == nil and {} or target.c.src
-            target.c.src[src_file] = target.c.src[src_file] == nil and {} or target.c.src[src_file]
-            target.c.src[src_file].object = dst_file
-        elseif ext == "cc" or ext == "cpp" or ext == "cxx" then
-            target.cxx.src = target.cxx.src == nil and {} or target.cxx.src
-            target.cxx.src[src_file] = target.cxx.src[src_file] == nil and {} or target.cxx.src[src_file]
-            target.cxx.src[src_file].object = dst_file
+    if target.cxx ~= nil then
+        if target.cxx.compiler == "g++" or target.cxx.compiler == "clang++" then
+            ext = ".o"
+        elseif target.cxx.compiler == "cl" then
+            ext = ".obj"
+        end
+        for k, v in pairs(target.cxx.src) do
+            local dst_file = target.tmp_dir .. target.separator .. k .. ext
+            v.object = dst_file
         end
     end
 end
@@ -294,13 +302,13 @@ end
 -- @param target A dict
 -- @return 1 for success, nil for failed
 local function luabuild_detect_compiler(target)
-    if target.c.src ~= nil then
+    if target.c ~= nil then
         target.c.compiler = luabuild_get_available_c_compiler()
         if target.c.compiler == nil then
             return
         end
     end
-    if target.cxx.src ~= nil then
+    if target.cxx ~= nil then
         target.cxx.compiler = luabuild_get_available_cxx_compiler()
         if target.cxx.compiler == nil then
             return
@@ -309,41 +317,25 @@ local function luabuild_detect_compiler(target)
     return 1
 end
 
-local function luabuild_add_compile_cflags(target, opt)
-    for k, _ in pairs(target.c.src) do
-        target.c.src[k].cflags = luabuild_get_compile_c_flags(target.c.compiler, target.mode, opt.type,
-            target.standard.c)
+local function luabuild_add_compile_flags(target, opt)
+    if target.c ~= nil then
+       target.c.cflags = luabuild_get_compile_c_flags(target.c.compiler, target.mode, opt.type,
+        target.standard.c)
     end
-end
-
-local function luabuild_add_compile_cxxflags(target, opt)
-    for k, _ in pairs(target.cxx.src) do
-        target.cxx.src[k].cxxflags = luabuild_get_compile_cxx_flags(target.cxx.compiler, target.mode, opt.type,
+    if target.cxx ~= nil then
+        target.cxx.cxxflags = luabuild_get_compile_cxx_flags(target.cxx.compiler, target.mode, opt.type,
             target.standard.cxx)
     end
 end
 
-local function luabuild_add_compile_flags_by_compiler(target, opt)
-    if target.c.src ~= nil then
-       luabuild_add_compile_cflags(target, opt)
-    end
-    if target.cxx.src ~= nil then
-        luabuild_add_compile_cxxflags(target, opt)
-    end
-end
-
-local function luabuild_add_include_flags_by_compiler(target)
-    if target.c.src ~= nil then
+local function luabuild_add_include_flags(target)
+    if target.c ~= nil then
         local cflags = luabuild_get_include_flags(target.c.compiler, target.include)
-        for k, _ in pairs(target.c.src) do
-            target.c.src[k].cflags = target.c.src[k].cflags .. " " .. cflags
-        end
+        target.c.cflags = target.c.cflags .. " " .. cflags
     end
-    if target.cxx.src ~= nil then
+    if target.cxx ~= nil then
         local cxxflags = luabuild_get_include_flags(target.cxx.compiler, target.include)
-        for k, _ in pairs(target.cxx.src) do
-            target.cxx.src[k].cxxflags = target.cxx.src[k].cxxflags .. " " .. cxxflags
-        end
+        target.cxx.cxxflags = target.cxx.cxxflags .. " " .. cxxflags
     end
 end
 
@@ -355,7 +347,7 @@ end
 --   + target.install_file: path to target binary
 -- @param target A dict contains user-defined rule
 -- @param opt User-defined options
-local function luabuild_generate_path(target, opt)
+local function luabuild_setup_target_path(target, opt)
     target.separator = vim.fn.has("windows") and "\\" or "/"
     target.tmp_dir = opt.cwd .. target.separator .. luabuild_get_tmp_dir(opt.tmp)
     target.install_dir = opt.cwd .. target.separator .. target.install
@@ -404,7 +396,7 @@ end
 
 local function luabuild_link(target, objects)
     local cmd
-    local linker = target.cxx.src ~= nil and target.cxx.compiler or target.c.compiler
+    local linker = target.cxx ~= nil and target.cxx.compiler or target.c.compiler
     if linker == "cl" then
         cmd = luabuild_link_cl(target, linker, objects)
     elseif linker == "gcc" or linker == "clang" or linker == "g++" or linker == "clang++" then
@@ -421,7 +413,7 @@ end
 local function luabuild_build_c_gcc_clang(target)
     local objects = ""
     for src, info in pairs(target.c.src) do
-        local cmd = target.c.compiler .. " " .. info.cflags .. " -c " .. src .. " -o " .. info.object
+        local cmd = target.c.compiler .. " " .. target.c.cflags .. " -c " .. info.source .. " -o " .. info.object
         objects = objects .. " " .. info.object
 
         local output = vim.fn.system(cmd)
@@ -436,7 +428,7 @@ end
 local function luabuild_build_cxx_gcc_clang(target)
     local objects = ""
     for src, info in pairs(target.cxx.src) do
-        local cmd = target.cxx.compiler .. " " .. info.cxxflags .. " -c " .. src .. " -o " .. info.object
+        local cmd = target.cxx.compiler .. " " .. target.cxx.cxxflags .. " -c " .. info.source .. " -o " .. info.object
         objects = objects .. " " .. info.object
 
         local output = vim.fn.system(cmd)
@@ -451,7 +443,7 @@ end
 local function luabuild_build_c_cl(target)
     local objects = ""
     for src, info in pairs(target.c.src) do
-        local cmd = target.c.compiler .. " " .. info.cflags .. " /c " .. src .. " /Fo\"" .. info.object .. "\""
+        local cmd = target.c.compiler .. " " .. target.c.cflags .. " /c " .. info.source .. " /Fo\"" .. info.object .. "\""
         objects = objects .. " " .. info.object
 
         local output = vim.fn.system(cmd)
@@ -466,7 +458,7 @@ end
 local function luabuild_build_cxx_cl(target)
     local objects = ""
     for src, info in pairs(target.cxx.src) do
-        local cmd = target.cxx.compiler .. " " .. info.cxxflags .. " /c " .. src .. " /Fo\"" .. info.object .. "\""
+        local cmd = target.cxx.compiler .. " " .. target.cxx.cxxflags .. " /c " .. info.source .. " /Fo\"" .. info.object .. "\""
         objects = objects .. " " .. info.object
 
         local output = vim.fn.system(cmd)
@@ -498,11 +490,11 @@ local function luabuild_build_and_link(target)
     local objects = ""
 
     -- compile c
-    if target.c.src ~= nil then
+    if target.c ~= nil then
         objects = objects .. luabuild_build_c(target)
     end
     -- compile cxx
-    if target.cxx.src ~= nil then
+    if target.cxx ~= nil then
         objects = objects .. luabuild_build_cxx(target)
     end
 
@@ -517,32 +509,40 @@ local function luabuild_cleanup(target)
     tmp_dir:rm({recursive = true})
 end
 
-local function luabuild_fix_object_ext(target)
-    if target.c.src ~= nil then
-        local ext = ""
-        if target.c.compiler == "gcc" or target.c.compiler == "clang" then
-            ext = ".o"
-        elseif target.c.compiler == "cl" then
-            ext = ".obj"
-        end
+local function luabuild_setup_target_table(target, opt)
+    for _, src in ipairs(target.source) do
+        local src_file = opt.cwd .. target.separator .. src
+        local ext = string.lower(luabuild_get_file_extension(src_file))
 
-        for _, v in pairs(target.c.src) do
-            v.object = v.object .. ext
+        if ext == "c" then
+            if target.c == nil then
+                target.c = {}
+            end
+            if target.c.src == nil then
+                target.c.src = {}
+            end
+            if target.c.src[src] == nil then
+                target.c.src[src] = {}
+            end
+            target.c.src[src].source = src_file
+        elseif ext == "cc" or ext == "cpp" or ext == "cxx" then
+            if target.cxx == nil then
+                target.cxx = {}
+            end
+            if target.cxx.src == nil then
+                target.cxx.src = {}
+            end
+            if target.cxx.src[src] == nil then
+                target.cxx.src[src] = {}
+            end
+            target.cxx.src[src].source = src_file
         end
     end
+end
 
-    if target.cxx.src ~= nil then
-        local ext = ""
-        if target.cxx.compiler == "g++" or target.cxx.compiler == "clang++" then
-            ext = ".o"
-        elseif target.cxx.compiler == "cl" then
-            ext = ".obj"
-        end
-
-        for _, v in pairs(target.cxx.src) do
-            v.object = v.object .. ext
-        end
-    end
+local function luabuild_setup_target(target, opt)
+    luabuild_setup_target_path(target, opt)
+    luabuild_setup_target_table(target, opt)
 end
 
 --- Compile and install
@@ -566,20 +566,16 @@ end
 --  | type     | string      | Build type. One of "debug" / "release"                                                 |
 M.make = function (rule, opt)
     local target = luabuild_copy_table(rule)
-    target.c = {}
-    target.cxx = {}
-
-    luabuild_generate_path(target, opt)
-    luabuild_add_object(target, opt)
+    luabuild_setup_target(target, opt)
 
     if not luabuild_detect_compiler(target) then
         vim.cmd[[echoerr "supported compiler not found"]]
         return
     end
-    luabuild_fix_object_ext(target)
+    luabuild_add_object(target)
 
-    luabuild_add_compile_flags_by_compiler(target, opt)
-    luabuild_add_include_flags_by_compiler(target)
+    luabuild_add_compile_flags(target, opt)
+    luabuild_add_include_flags(target)
 
     luabuild_setup(target)
     luabuild_build_and_link(target)
