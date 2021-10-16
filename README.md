@@ -110,5 +110,9 @@ require("luabuild").make({
     source = { "src/fzf.c" },
     -- They use '-std=gnu99', it is c99 standard
     standard = { c = "c99" },
+}, {
+    cwd = path_to_repo, -- specific path here
 })
 ```
+
+Checkout [nvim-telescope/telescope-fzf-native.nvim](https://github.com/qgymib/luabuild-addons.nvim#nvim-telescopetelescope-fzf-nativenvim) for realword working code.
